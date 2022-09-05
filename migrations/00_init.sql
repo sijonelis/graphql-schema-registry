@@ -1,47 +1,66 @@
 CREATE TABLE IF NOT EXISTS persisted_queries
 (
-    `key`          varchar(100) NOT NULL,
+    "key"        varchar(100) NOT NULL,
     query        text         NOT NULL,
-    is_active    int          NOT NULL DEFAULT '1',
-    updated_time datetime              DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    added_time   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`key`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+    is_active    BOOLEAN          NOT NULL DEFAULT '1',
+    updated_time TIMESTAMP    DEFAULT NULL,
+    added_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("key")
+);
+
+CREATE FUNCTION update_updated_time_column() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+  BEGIN
+    NEW.updated_time = NOW();
+    RETURN NEW;
+  END;
+$$;
+
+CREATE TRIGGER persisted_queries_updated_time_modtime BEFORE UPDATE ON persisted_queries FOR EACH ROW EXECUTE PROCEDURE update_updated_time_column();
 
 CREATE TABLE IF NOT EXISTS services
 (
-    id           int unsigned NOT NULL AUTO_INCREMENT,
+    id           SERIAL NOT NULL,
     name         varchar(255) NOT NULL DEFAULT '',
-    is_active    int          NOT NULL DEFAULT '1',
-    updated_time datetime              DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    added_time   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_active    BOOLEAN          NOT NULL DEFAULT '1',
+    updated_time TIMESTAMP              DEFAULT NULL,
+    added_time   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY name (name)
-) ENGINE = InnoDB AUTO_INCREMENT = 3 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+    UNIQUE (name)
+);
 
-CREATE TABLE IF NOT EXISTS `schema`
+CREATE TRIGGER services_updated_time_modtime BEFORE UPDATE ON services FOR EACH ROW EXECUTE PROCEDURE update_updated_time_column();
+
+CREATE TABLE IF NOT EXISTS "schema"
 (
-    id           int unsigned NOT NULL AUTO_INCREMENT,
-    service_id   int unsigned          DEFAULT NULL,
-    is_active    tinyint               DEFAULT '1' COMMENT 'If schema is deleted, this is set to 0',
-    type_defs    text COMMENT 'Graphql schema definition for specific service',
-    added_time   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Time of first registration',
-    updated_time datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Time of last registration OR deactivation',
+	  id           SERIAL 	   NOT NULL,
+    service_id   int           DEFAULT NULL,
+    is_active    BOOLEAN       DEFAULT '1',
+    type_defs    text,
+    added_time   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY service_id (service_id),
     CONSTRAINT schema_ibfk_1 FOREIGN KEY (service_id) REFERENCES services (id) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+);
+
+COMMENT ON COLUMN  "schema".type_defs is 'Graphql schema definition for specific service';
+COMMENT ON COLUMN  "schema".is_active is 'If schema is deleted, this is set to 0';
+COMMENT ON COLUMN  "schema".added_time is 'Time of first registration';
+COMMENT ON COLUMN  "schema".updated_time is 'Time of last registration OR deactivation';
+
+CREATE TRIGGER schema_updated_time_modtime BEFORE UPDATE ON "schema" FOR EACH ROW EXECUTE PROCEDURE update_updated_time_column();
 
 CREATE TABLE IF NOT EXISTS container_schema
 (
-    id         int unsigned NOT NULL AUTO_INCREMENT,
-    service_id int unsigned NOT NULL,
-    schema_id  int unsigned NOT NULL,
+    id         SERIAL NOT NULL,
+    service_id int NOT NULL,
+    schema_id  int NOT NULL,
     version    varchar(100) NOT NULL DEFAULT '',
-    added_time datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    added_time TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY service_id (service_id, version),
-    KEY schema_id (schema_id),
+    UNIQUE (service_id, version),
+    UNIQUE (service_id),
     CONSTRAINT container_schema_ibfk_1 FOREIGN KEY (service_id) REFERENCES services (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT container_schema_ibfk_2 FOREIGN KEY (schema_id) REFERENCES `schema` (id) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+    CONSTRAINT container_schema_ibfk_2 FOREIGN KEY (schema_id) REFERENCES "schema" (id) ON DELETE CASCADE ON UPDATE CASCADE
+);

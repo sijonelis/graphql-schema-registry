@@ -26,7 +26,7 @@ const { host, port, username, secret, name } =
 	diplomat.getServiceInstance(DB_SCHEMA_REGISTRY);
 
 export const connection = knex({
-	client: 'mysql2',
+	client: 'pg',
 	log: {
 		warn: logger.info,
 		error: logger.error,
